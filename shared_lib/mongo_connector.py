@@ -24,7 +24,7 @@ class MongoWriter:
             raise
 
     def insert(self, document: dict):
-        if not self.collection:
+        if self.collection in None:
             raise RuntimeError("MongoWriter not connected. Call connect() first.")
         try:
             self.collection.insert_one(document)
