@@ -24,14 +24,20 @@ class MongoWriter:
             raise
 
     def insert(self, document: dict):
-        if self.collection in None:
+        if self.collection is None:
             raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if not document or not isinstance(document, dict):
+            logger.warning(f"Skipping invalid document: {document}")
+            return  # don’t crash, just skip
+
         try:
-            # self.collection.insert_one(document)
-                    # Drop empty/invalid _id so Mongo will generate one
+            # Drop empty/invalid _id so Mongo will generate one
             if "_id" in document and (document["_id"] is None or document["_id"] == ""):
                 document.pop("_id")
+
             self.collection.insert_one(document)
+
         except Exception as e:
             logger.error(f"Failed to insert document: {e}")
 
