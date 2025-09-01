@@ -27,6 +27,10 @@ class MongoWriter:
         if self.collection in None:
             raise RuntimeError("MongoWriter not connected. Call connect() first.")
         try:
+            # self.collection.insert_one(document)
+                    # Drop empty/invalid _id so Mongo will generate one
+            if "_id" in document and (document["_id"] is None or document["_id"] == ""):
+                document.pop("_id")
             self.collection.insert_one(document)
         except Exception as e:
             logger.error(f"Failed to insert document: {e}")
