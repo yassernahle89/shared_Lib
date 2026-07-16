@@ -1,5 +1,7 @@
 from pymongo import MongoClient
 import logging
+from bson import ObjectId
+from bson.errors import InvalidId
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +72,44 @@ class MongoWriter:
         if self.client:
             self.client.close()
 
+    def get(self, doc_id, collection_name=None):
+        """
+        Fetch a document by its _id, optionally from a different collection
+        than the one bound at connect() time.
+
+        collection_name: if provided, queries self.db[collection_name] instead
+                          of the default self.collection.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if doc_id is None:
+            logger.warning("Skipping get(): doc_id is None")
+            return None
+
+        # Resolve which collection to query
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        query_id = doc_id
+        if isinstance(doc_id, str):
+            try:
+                query_id = ObjectId(doc_id)
+            except InvalidId:
+                query_id = doc_id
+
+        try:
+            return collection.find_one({"_id": query_id})
+        except Exception as e:
+            logger.error(
+                f"Failed to fetch document with _id={doc_id} "
+                f"from collection={collection_name or self.collection_name}: {e}"
+            )
+            return None
 # from pymongo import MongoClient
 # import logging
 
