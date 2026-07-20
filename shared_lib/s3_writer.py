@@ -13,7 +13,7 @@ class S3Writer:
         aws_access_key_id: str,
         aws_secret_access_key: str,
         region_name: str,
-    ):
+    ) -> None:
         try:
             self.client = boto3.client(
                 "s3",
@@ -38,7 +38,40 @@ class S3Writer:
             raise ValueError(f"Invalid S3 path (missing key): {s3_path}")
         return bucket, key
 
-    def save_result(self, result, file_s3_url: str, result_filename: str = "result.json"):
+    def get_file(self, file_s3_url: str):
+        """
+        Fetch a file directly from the given S3 URL
+        (e.g. "s3://my-bucket/a/b/c/d/prompting.txt").
+
+        Returns:
+            - dict/list if the key ends in .json (parsed)
+            - str if the key looks like text (.txt, .csv, .md, etc.)
+            - bytes otherwise
+            - None if the object doesn't exist or fetch fails
+        """
+        try:
+            bucket, key = self._parse_s3_path(file_s3_url)
+
+            response = self.client.get_object(Bucket=bucket, Key=key)
+            body = response["Body"].read()
+
+            guessed_type, _ = mimetypes.guess_type(key)
+
+            if key.endswith(".json"):
+                return json.loads(body.decode("utf-8"))
+            if guessed_type and guessed_type.startswith("text"):
+                return body.decode("utf-8")
+
+            return body
+
+        except self.client.exceptions.NoSuchKey:
+            logger.warning(f"File not found: {file_s3_url}")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get file {file_s3_url}: {e}")
+            return None
+
+    def save_result(self, result, file_s3_url: str, result_filename: str = "result.json") -> None:
         """
         Save `result` next to the given source file's S3 URL — i.e. in the
         same "folder" (key prefix), under `result_filename`.
