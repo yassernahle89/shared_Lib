@@ -71,6 +71,30 @@ class S3Writer:
             logger.error(f"Failed to get file {file_s3_url}: {e}")
             return None
 
+    def get_rawfile(self, file_s3_url: str):
+        """
+        Fetch a file directly from the given S3 URL
+        (e.g. "s3://my-bucket/a/b/c/d/prompting.txt").
+
+        Returns:
+            - bytes: the raw file content
+            - None if the object doesn't exist or fetch fails
+        """
+        try:
+            bucket, key = self._parse_s3_path(file_s3_url)
+
+            response = self.client.get_object(Bucket=bucket, Key=key)
+            body = response["Body"].read()
+
+            return body
+
+        except self.client.exceptions.NoSuchKey:
+            logger.warning(f"File not found: {file_s3_url}")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get file {file_s3_url}: {e}")
+            return None
+
     def save_result(self, result, file_s3_url: str, result_filename: str = "result.json") -> None:
         """
         Save `result` next to the given source file's S3 URL — i.e. in the
