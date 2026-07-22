@@ -148,10 +148,11 @@ class KafkaConsumerService:
                     inserted_id = self.mongo_writer.insert(document)
                     batch_id = document.get("BatchId")
                     batch = self.mongo_writer.get(batch_id, "batch")
+                    file_id = document.get("FileId")
 
                     ctx = {
                         "mongo_writer": self.mongo_writer,
-                        "file_id": inserted_id,
+                        "file_id": file_id,
                         "batch_id": document.get("BatchId"),
                     }
                     self.callback(document, batch, msg.value(), ctx)
