@@ -149,7 +149,13 @@ class KafkaConsumerService:
                     batch_id = document.get("BatchId")
                     batch = self.mongo_writer.get(batch_id, "batch")
 
-                    self.callback(document, batch, msg.value())
+                    ctx = {
+                        "mongo_writer": self.mongo_writer,
+                        "file_id": inserted_id,
+                        "batch_id": document.get("BatchId"),
+                    }
+                    self.callback(document, batch, msg.value(), ctx)
+                    # self.callback(document, batch, msg.value())
 
                 except Exception as inner_e:
                     # Something failed mid-way: roll back the insert so we

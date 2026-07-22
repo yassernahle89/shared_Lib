@@ -110,6 +110,46 @@ class MongoWriter:
                 f"from collection={collection_name or self.collection_name}: {e}"
             )
             return None
+
+    def update(self, doc_id, fields: dict, collection_name=None) -> bool:
+        """
+        Update specific fields on a document by its _id (uses $set).
+        Returns True if a document was actually matched and modified.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if doc_id is None:
+            logger.warning("Skipping update(): doc_id is None")
+            return False
+
+        if not fields or not isinstance(fields, dict):
+            logger.warning(f"Skipping update(): invalid fields {fields}")
+            return False
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        query_id = doc_id
+        if isinstance(doc_id, str):
+            try:
+                query_id = ObjectId(doc_id)
+            except InvalidId:
+                query_id = doc_id
+
+        try:
+            result = collection.update_one({"_id": query_id}, {"$set": fields})
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(
+                f"Failed to update document with _id={doc_id} "
+                f"from collection={collection_name or self.collection_name}: {e}"
+            )
+            raise
 # from pymongo import MongoClient
 # import logging
 
