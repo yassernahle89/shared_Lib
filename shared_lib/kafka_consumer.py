@@ -142,10 +142,16 @@ class KafkaConsumerService:
 
             else:
                 document = json.loads(msg.value())
-
+                # Store the Kafka message in MongoDB
+                mongo_document = {
+                    "message": document,
+                    "topic": self.topic
+                    }
                 try:
                     # --- DB + processing work: all-or-nothing ---
-                    inserted_id = self.mongo_writer.insert(document)
+                    # inserted_id = self.mongo_writer.insert(document)
+                    inserted_id = self.mongo_writer.insert(mongo_document)
+
                     batch_id = document.get("BatchId")
                     batch = self.mongo_writer.get(batch_id, "batch")
                     file_id = document.get("FileId")
