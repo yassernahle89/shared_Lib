@@ -150,6 +150,32 @@ class MongoWriter:
                 f"from collection={collection_name or self.collection_name}: {e}"
             )
             raise
+    
+    def find(self, query: dict, collection_name=None) -> list:
+        """
+        Fetch multiple documents matching a query, optionally from a
+        different collection than the one bound at connect() time.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        try:
+            return list(collection.find(query))
+        except Exception as e:
+            logger.error(
+                f"Failed to query documents with query={query} "
+                f"from collection={collection_name or self.collection_name}: {e}"
+            )
+            return []
+
+
 # from pymongo import MongoClient
 # import logging
 
