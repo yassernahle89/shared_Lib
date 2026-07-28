@@ -50,7 +50,7 @@ class KafkaConsumerService:
         self.group_id = group_id
 
         self.poll_timeout_sec = poll_timeout_sec or float(
-            os.environ.get("POLL_TIMEOUT_SEC", "10")
+            os.environ.get("POLL_TIMEOUT_SEC", "2")
         )
         self.mongodb_url = mongodb_url or os.environ["MONGODB_URL"]
         self.mongo_db = mongo_db
@@ -86,7 +86,7 @@ class KafkaConsumerService:
 
         self.mongo_writer: MongoWriter = None
         self.consumer: Consumer = None
-        self._stop_heartbeat = threading.Event()
+        # self._stop_heartbeat = threading.Event()sss
 
     def _heartbeat_loop(self):
         # Placeholder thread, kept for parity with the original script in
@@ -125,8 +125,8 @@ class KafkaConsumerService:
         self.consumer = Consumer(self.conf)
         self.consumer.subscribe([self.topic])
 
-        hb_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
-        hb_thread.start()
+        # hb_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        # hb_thread.start()
 
         exit_code = 0
         inserted_id = None
@@ -185,7 +185,7 @@ class KafkaConsumerService:
             exit_code = 1
 
         finally:
-            self._stop_heartbeat.set()
+            # self._stop_heartbeat.set()
             self.consumer.close()
             self.mongo_writer.close()
 
