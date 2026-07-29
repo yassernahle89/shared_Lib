@@ -50,7 +50,7 @@ class KafkaConsumerService:
         self.group_id = group_id
 
         self.poll_timeout_sec = poll_timeout_sec or float(
-            os.environ.get("POLL_TIMEOUT_SEC", "2")
+            os.environ.get("POLL_TIMEOUT_SEC", "10")
         )
         self.mongodb_url = mongodb_url or os.environ["MONGODB_URL"]
         self.mongo_db = mongo_db
