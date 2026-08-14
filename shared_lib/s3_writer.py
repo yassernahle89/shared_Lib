@@ -2,6 +2,7 @@ import boto3
 import json
 import logging
 import mimetypes
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,7 @@ class S3Writer:
             logger.error(f"Failed to get file {file_s3_url}: {e}")
             return None
 
-    def save_result(self, result, file_s3_url: str, result_filename: str = "result.json") -> None:
+    def save_result(self, result: Any, file_s3_url: str, result_filename: str = "result.json") -> None:
         """
         Save `result` next to the given source file's S3 URL — i.e. in the
         same "folder" (key prefix), under `result_filename`.
@@ -142,3 +143,93 @@ class S3Writer:
         except Exception as e:
             logger.error(f"Failed to save result (source: {file_s3_url}): {e}")
             raise
+
+    def save_cleaning_data(self, result: Any, file_s3_url: str) -> None:
+        """
+        Save `result` next to the given raw file's S3 URL — i.e. in the
+        same "folder" (key prefix), under "cleaning_results.json".
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> result is written to "s3://my-bucket/a/b/c/d/cleaning_results.json"
+        """
+        self.save_result(result, file_s3_url, result_filename="cleaning_results.json")
+
+    def get_cleaning_data(self, file_s3_url: str):
+        """
+        Fetch "cleaning_results.json" from the same "folder" (key prefix)
+        as the given raw file's S3 URL.
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> fetches "s3://my-bucket/a/b/c/d/cleaning_results.json"
+
+        Returns:
+            - dict/list: the parsed cleaning results
+            - None if the object doesn't exist or fetch fails
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        prefix = file_key.rsplit("/", 1)[0] + "/" if "/" in file_key else ""
+        cleaning_s3_url = f"s3://{bucket}/{prefix}cleaning_results.json"
+
+        return self.get_file(cleaning_s3_url)
+
+    def save_chunking_data(self, result: Any, file_s3_url: str) -> None:
+        """
+        Save `result` next to the given raw file's S3 URL — i.e. in the
+        same "folder" (key prefix), under "chunking_results.json".
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> result is written to "s3://my-bucket/a/b/c/d/chunking_results.json"
+        """
+        self.save_result(result, file_s3_url, result_filename="chunking_results.json")
+
+    def get_chunking_data(self, file_s3_url: str):
+        """
+        Fetch "chunking_results.json" from the same "folder" (key prefix)
+        as the given raw file's S3 URL.
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> fetches "s3://my-bucket/a/b/c/d/chunking_results.json"
+
+        Returns:
+            - dict/list: the parsed chunking results
+            - None if the object doesn't exist or fetch fails
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        prefix = file_key.rsplit("/", 1)[0] + "/" if "/" in file_key else ""
+        chunking_s3_url = f"s3://{bucket}/{prefix}chunking_results.json"
+
+        return self.get_file(chunking_s3_url)
+
+    def save_summarizer_data(self, result: Any, file_s3_url: str) -> None:
+        """
+        Save `result` next to the given raw file's S3 URL — i.e. in the
+        same "folder" (key prefix), under "summarizer_results.json".
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> result is written to "s3://my-bucket/a/b/c/d/summarizer_results.json"
+        """
+        self.save_result(result, file_s3_url, result_filename="summarizer_results.json")
+
+    def get_summarizer_data(self, file_s3_url: str):
+        """
+        Fetch "summarizer_results.json" from the same "folder" (key prefix)
+        as the given raw file's S3 URL.
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> fetches "s3://my-bucket/a/b/c/d/summarizer_results.json"
+
+        Returns:
+            - dict/list: the parsed summarizer results
+            - None if the object doesn't exist or fetch fails
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        prefix = file_key.rsplit("/", 1)[0] + "/" if "/" in file_key else ""
+        summarizer_s3_url = f"s3://{bucket}/{prefix}summarizer_results.json"
+
+        return self.get_file(summarizer_s3_url)
