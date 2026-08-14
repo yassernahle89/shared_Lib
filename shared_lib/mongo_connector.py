@@ -154,9 +154,10 @@ class MongoWriter:
     
     def update_topics_and_clusters(self, doc_id, cluster_keywords: list, collection_name="batch") -> bool:
         """
-        Update only the `Topics` and `Clusters` fields on a batch document
-        by its _id. Builds the Topic/Cluster objects from the given data and
-        replaces each list wholesale.
+        Update the `Topics` and `Clusters` fields on a batch document by its
+        _id, and set `status` to "AwaitingHumanReview". Builds the
+        Topic/Cluster objects from the given data and replaces each list
+        wholesale.
 
         cluster_keywords: list of single-entry dicts mapping a cluster number
             to its keyword list, e.g.:
@@ -193,7 +194,7 @@ class MongoWriter:
 
         return self.update(
             doc_id,
-            {"Topics": topic_docs, "Clusters": cluster_docs},
+            {"Topics": topic_docs, "Clusters": cluster_docs, "status": "AwaitingHumanReview"},
             collection_name=collection_name,
         )
 
