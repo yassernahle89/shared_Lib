@@ -1,5 +1,6 @@
 from pymongo import MongoClient
 import logging
+import uuid
 from bson import ObjectId
 from bson.errors import InvalidId
 
@@ -151,6 +152,70 @@ class MongoWriter:
             )
             raise
     
+    def update_topics_and_clusters(self, doc_id, cluster_keywords: list, collection_name="batch") -> bool:
+        """
+        Update only the `Topics` and `Clusters` fields on a batch document
+        by its _id. Builds the Topic/Cluster objects from the given data and
+        replaces each list wholesale.
+
+        cluster_keywords: list of single-entry dicts mapping a cluster number
+            to its keyword list, e.g.:
+            [
+                {20: ["privacy", "policy", "u", "information", ...]},
+                {12: ["website", "using", "thank", "agree", ...]},
+            ]
+            Each entry produces one Cluster, and each keyword in its list
+            becomes its own Topic under that cluster.
+
+        Returns True if a document was actually matched and modified.
+        """
+        topic_docs = []
+        cluster_docs = []
+
+        for entry in cluster_keywords:
+            for cluster_num, keywords in entry.items():
+                cluster_id = str(uuid.uuid4())
+                cluster_docs.append({
+                    "ClusterId": cluster_id,
+                    "Name": str(cluster_num),
+                    "IsActive": True,
+                })
+
+                for keyword in keywords:
+                    topic_docs.append({
+                        "TopicId": str(uuid.uuid4()),
+                        "Label": f"Topic_{cluster_num}",
+                        "ClusterId": cluster_id,
+                        "Keywords": [keyword],
+                        "Score": 0.0,
+                        "IsActive": True,
+                    })
+
+        return self.update(
+            doc_id,
+            {"Topics": topic_docs, "Clusters": cluster_docs},
+            collection_name=collection_name,
+        )
+
+    def get_active_clusters(self, doc_id, collection_name="batch") -> list:
+        """
+        Fetch a batch document by its _id and return the names of its
+        active clusters (Cluster.IsActive == True).
+
+        Returns a list of cluster name strings (empty if the document
+        doesn't exist or has no active clusters).
+        """
+        document = self.get(doc_id, collection_name=collection_name)
+        if not document:
+            logger.warning(f"Skipping get_active_clusters(): document not found for _id={doc_id}")
+            return []
+
+        return [
+            cluster["Name"]
+            for cluster in document.get("Clusters", [])
+            if cluster.get("IsActive")
+        ]
+
     def find(self, query: dict, collection_name=None) -> list:
         """
         Fetch multiple documents matching a query, optionally from a
