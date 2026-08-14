@@ -233,3 +233,33 @@ class S3Writer:
         summarizer_s3_url = f"s3://{bucket}/{prefix}summarizer_results.json"
 
         return self.get_file(summarizer_s3_url)
+
+    def save_topics_clusters_data(self, result: Any, file_s3_url: str) -> None:
+        """
+        Save `result` next to the given raw file's S3 URL — i.e. in the
+        same "folder" (key prefix), under "topic_results.json".
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> result is written to "s3://my-bucket/a/b/c/d/topic_results.json"
+        """
+        self.save_result(result, file_s3_url, result_filename="topic_results.json")
+
+    def get_topics_clusters_data(self, file_s3_url: str):
+        """
+        Fetch "topic_results.json" from the same "folder" (key prefix)
+        as the given raw file's S3 URL.
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> fetches "s3://my-bucket/a/b/c/d/topic_results.json"
+
+        Returns:
+            - dict/list: the parsed topic clustering results
+            - None if the object doesn't exist or fetch fails
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        prefix = file_key.rsplit("/", 1)[0] + "/" if "/" in file_key else ""
+        topics_s3_url = f"s3://{bucket}/{prefix}topic_results.json"
+
+        return self.get_file(topics_s3_url)
