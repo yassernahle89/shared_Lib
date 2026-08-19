@@ -263,3 +263,81 @@ class S3Writer:
         topics_s3_url = f"s3://{bucket}/{prefix}topic_results.json"
 
         return self.get_file(topics_s3_url)
+
+    @staticmethod
+    def _upper_level_prefix(file_key):
+        """
+        Given a key like "a/b/c/d/prompting.txt", return the prefix one
+        folder level up: "a/b/c/". Returns "" if there's no level above
+        the raw file's own folder.
+        """
+        folder = file_key.rsplit("/", 1)[0] if "/" in file_key else ""
+        return folder.rsplit("/", 1)[0] + "/" if "/" in folder else ""
+
+    def save_topics_clusters_data_by_batch(self, result: Any, file_s3_url: str) -> None:
+        """
+        Save `result` one folder level above the given raw file's S3 URL,
+        under "batch_topic_results.json".
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> result is written to "s3://my-bucket/a/b/c/batch_topic_results.json"
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        upper_prefix = self._upper_level_prefix(file_key)
+        upper_s3_url = f"s3://{bucket}/{upper_prefix}placeholder"
+
+        self.save_result(result, upper_s3_url, result_filename="batch_topic_results.json")
+
+    def get_topics_clusters_data_by_batch(self, file_s3_url: str):
+        """
+        Fetch "batch_topic_results.json" from one folder level above the
+        given raw file's S3 URL.
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> fetches "s3://my-bucket/a/b/c/batch_topic_results.json"
+
+        Returns:
+            - dict/list: the parsed batch topic clustering results
+            - None if the object doesn't exist or fetch fails
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        upper_prefix = self._upper_level_prefix(file_key)
+        batch_s3_url = f"s3://{bucket}/{upper_prefix}batch_topic_results.json"
+
+        return self.get_file(batch_s3_url)
+
+    def save_topics_clusters_data_by_batch_preview(self, result: Any, file_s3_url: str) -> None:
+        """
+        Save `result` one folder level above the given raw file's S3 URL,
+        under "batch_topic_results_preview.json".
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> result is written to "s3://my-bucket/a/b/c/batch_topic_results_preview.json"
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        upper_prefix = self._upper_level_prefix(file_key)
+        upper_s3_url = f"s3://{bucket}/{upper_prefix}placeholder"
+
+        self.save_result(result, upper_s3_url, result_filename="batch_topic_results_preview.json")
+
+    def get_topics_clusters_data_by_batch_preview(self, file_s3_url: str):
+        """
+        Fetch "batch_topic_results_preview.json" from one folder level
+        above the given raw file's S3 URL.
+
+        Example:
+            file_s3_url = "s3://my-bucket/a/b/c/d/prompting.txt"
+            -> fetches "s3://my-bucket/a/b/c/batch_topic_results_preview.json"
+
+        Returns:
+            - dict/list: the parsed batch topic clustering preview results
+            - None if the object doesn't exist or fetch fails
+        """
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        upper_prefix = self._upper_level_prefix(file_key)
+        preview_s3_url = f"s3://{bucket}/{upper_prefix}batch_topic_results_preview.json"
+
+        return self.get_file(preview_s3_url)
