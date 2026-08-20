@@ -165,8 +165,9 @@ class MongoWriter:
                 {20: ["privacy", "policy", "u", "information", ...]},
                 {12: ["website", "using", "thank", "agree", ...]},
             ]
-            Each entry produces one Cluster, and each keyword in its list
-            becomes its own Topic under that cluster.
+            Each entry produces one Cluster and one Topic under that
+            cluster, with the entry's full keyword list stored on the
+            Topic's Keywords field.
 
         Returns True if a document was actually matched and modified.
         """
@@ -182,15 +183,14 @@ class MongoWriter:
                     "IsActive": True,
                 })
 
-                for keyword in keywords:
-                    topic_docs.append({
-                        "TopicId": str(uuid.uuid4()),
-                        "Label": f"Topic_{cluster_num}",
-                        "ClusterId": cluster_id,
-                        "Keywords": [keyword],
-                        "Score": 0.0,
-                        "IsActive": True,
-                    })
+                topic_docs.append({
+                    "TopicId": str(uuid.uuid4()),
+                    "Label": f"Topic_{cluster_num}",
+                    "ClusterId": cluster_id,
+                    "Keywords": keywords,
+                    "Score": 0.0,
+                    "IsActive": True,
+                })
 
         return self.update(
             doc_id,
