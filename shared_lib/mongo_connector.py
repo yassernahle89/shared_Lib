@@ -159,15 +159,14 @@ class MongoWriter:
         Topic/Cluster objects from the given data and replaces each list
         wholesale.
 
-        cluster_keywords: list of single-entry dicts mapping a cluster number
-            to its keyword list, e.g.:
+        cluster_keywords: list of dicts, one per cluster, e.g.:
             [
-                {20: ["privacy", "policy", "u", "information", ...]},
-                {12: ["website", "using", "thank", "agree", ...]},
+                {"cluster": 20, "keywords": ["privacy", "policy", ...], "count": 123},
+                {"cluster": 12, "keywords": ["website", "using", ...], "count": 45},
             ]
-            Each entry produces one Cluster and one Topic under that
-            cluster, with the entry's full keyword list stored on the
-            Topic's Keywords field.
+            Each entry produces one Cluster (carrying that cluster's
+            `count` as `Count`) and one Topic under that cluster, with the
+            entry's full keyword list stored on the Topic's Keywords field.
 
         Returns True if a document was actually matched and modified.
         """
@@ -175,22 +174,26 @@ class MongoWriter:
         cluster_docs = []
 
         for entry in cluster_keywords:
-            for cluster_num, keywords in entry.items():
-                cluster_id = str(uuid.uuid4())
-                cluster_docs.append({
-                    "ClusterId": cluster_id,
-                    "Name": str(cluster_num),
-                    "IsActive": True,
-                })
+            cluster_num = entry["cluster"]
+            keywords = entry["keywords"]
+            count = entry["count"]
 
-                topic_docs.append({
-                    "TopicId": str(uuid.uuid4()),
-                    "Label": f"Topic_{cluster_num}",
-                    "ClusterId": cluster_id,
-                    "Keywords": keywords,
-                    "Score": 0.0,
-                    "IsActive": True,
-                })
+            cluster_id = str(uuid.uuid4())
+            cluster_docs.append({
+                "ClusterId": cluster_id,
+                "Name": str(cluster_num),
+                "Count": count,
+                "IsActive": True,
+            })
+
+            topic_docs.append({
+                "TopicId": str(uuid.uuid4()),
+                "Label": f"Topic_{cluster_num}",
+                "ClusterId": cluster_id,
+                "Keywords": keywords,
+                "Score": 0.0,
+                "IsActive": True,
+            })
 
         return self.update(
             doc_id,
