@@ -69,6 +69,37 @@ class MongoWriter:
         except Exception as e:
             logger.error(f"Failed to insert document: {e}")
 
+    def insert_many(self, documents: list, collection_name: str) -> bool:
+        """
+        Insert a list of documents into the given collection in a single
+        multi-document transaction (all-or-nothing), not one insert at a
+        time. Each document is expected to already carry its own `_id`.
+
+        Requires MongoDB to be a replica set or sharded cluster — standalone
+        deployments don't support transactions.
+
+        Returns True if the transaction committed successfully.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if not documents or not isinstance(documents, list):
+            logger.warning(f"Skipping insert_many(): invalid documents {documents}")
+            return False
+
+        collection = self.client[self.db_name][collection_name]
+
+        try:
+            with self.client.start_session() as session:
+                with session.start_transaction():
+                    collection.insert_many(documents, session=session)
+
+            logger.info(f"Inserted {len(documents)} documents into {collection_name} (transaction committed)")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to insert {len(documents)} documents into {collection_name}: {e}")
+            raise
+
     def close(self):
         if self.client:
             self.client.close()

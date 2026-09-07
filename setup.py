@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="shared_lib",
-    version="0.1.25",
+    version="0.1.26",
     packages=find_packages(),
     install_requires=[],
 )
