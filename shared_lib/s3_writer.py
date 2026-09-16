@@ -104,7 +104,7 @@ class S3Writer:
         The CSV is expected to always have 2 columns: question and answer.
 
         Returns:
-            - list[dict]: one dict per row, keyed by the CSV's own header
+            - list[dict]: one dict per row, keyed by the CSV's cleaned header
               (e.g. [{"question": "...", "answer": "..."}, ...])
             - None if the object doesn't exist or fetch fails
         """
@@ -114,7 +114,12 @@ class S3Writer:
             response = self.client.get_object(Bucket=bucket, Key=key)
             body = response["Body"].read()
 
-            return list(csv.DictReader(io.StringIO(body.decode("utf-8"))))
+            reader = csv.DictReader(io.StringIO(body.decode("utf-8")))
+            reader.fieldnames = [
+                (name or "").strip().lstrip("﻿") for name in reader.fieldnames
+            ]
+
+            return list(reader)
 
         except self.client.exceptions.NoSuchKey:
             logger.warning(f"File not found: {file_s3_url}")
