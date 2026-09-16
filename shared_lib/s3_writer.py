@@ -1,4 +1,6 @@
 import boto3
+import csv
+import io
 import json
 import logging
 import mimetypes
@@ -98,10 +100,12 @@ class S3Writer:
 
     def get_faq(self, file_s3_url: str):
         """
-        Fetch a FAQ CSV file directly from the given S3 URL.
+        Fetch a FAQ CSV file directly from the given S3 URL and parse it.
+        The CSV is expected to always have 2 columns: question and answer.
 
         Returns:
-            - str: the raw CSV content, UTF-8 decoded
+            - list[dict]: one dict per row, keyed by the CSV's own header
+              (e.g. [{"question": "...", "answer": "..."}, ...])
             - None if the object doesn't exist or fetch fails
         """
         try:
@@ -110,7 +114,7 @@ class S3Writer:
             response = self.client.get_object(Bucket=bucket, Key=key)
             body = response["Body"].read()
 
-            return body.decode("utf-8")
+            return list(csv.DictReader(io.StringIO(body.decode("utf-8"))))
 
         except self.client.exceptions.NoSuchKey:
             logger.warning(f"File not found: {file_s3_url}")
