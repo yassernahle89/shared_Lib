@@ -18,7 +18,7 @@ class KafkaProducerService:
         self._flush_timeout = (
             flush_timeout
             if flush_timeout is not None
-            else float(os.environ.get("PRODUCER_FLUSH_TIMEOUT_SECONDS", 10))
+            else float(os.environ.get("PRODUCER_FLUSH_TIMEOUT_SECONDS", 20))
         )
 
     def produce(self, topic: str, value: dict, key: str = None, flush: bool = True) -> None:
@@ -95,6 +95,16 @@ class KafkaProducerService:
 
     def close(self):
         try:
-            self._producer.flush(timeout=self._flush_timeout)
+            remaining = self._producer.flush(timeout=self._flush_timeout)
+            if remaining > 0:
+                logger.error(
+                    f"close(): {remaining} message(s) still undelivered after "
+                    f"flush timeout ({self._flush_timeout}s)"
+                )
         except Exception as e:
             logger.error(f"Error flushing producer during close: {e}")
+    # def close(self):
+    #     try:
+    #         self._producer.flush(timeout=self._flush_timeout)
+    #     except Exception as e:
+    #         logger.error(f"Error flushing producer during close: {e}")
