@@ -338,6 +338,28 @@ class MongoWriter:
             logger.error(f"Failed to create search index '{searchIndexName}': {e}")
             raise
 
+    def SearchIndexExists(self, searchIndexName: str, collection_name=None) -> bool:
+        """
+        Check whether a search index with the given name already exists on
+        the collection. Call this before CreateSearchIndex() to avoid a
+        duplicate-index error.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        try:
+            return any(collection.list_search_indexes(searchIndexName))
+        except Exception as e:
+            logger.error(f"Failed to check search index '{searchIndexName}': {e}")
+            raise
+
 # from pymongo import MongoClient
 # import logging
 
