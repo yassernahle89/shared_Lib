@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+from pymongo.operations import SearchIndexModel
 import logging
 import uuid
 from bson import ObjectId
@@ -275,6 +276,67 @@ class MongoWriter:
             )
             return []
 
+
+    def CreateSearchIndex(self, searchIndexName: str, collection_name=None) -> bool:
+        """
+        Create a MongoDB Atlas vector search index on the given collection.
+        `numDimensions` is inferred from the length of the `embedding`
+        field on the collection's first document.
+
+        Returns True if the index was created successfully.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        sample_doc = collection.find_one({}, {"embedding": 1})
+        if not sample_doc or "embedding" not in sample_doc:
+            raise ValueError(
+                f"Cannot determine vector_dim: no document with an 'embedding' field "
+                f"found in collection={collection_name or self.collection_name}"
+            )
+
+        vector_dim = len(sample_doc["embedding"])
+
+        search_index_model = SearchIndexModel(
+            definition={
+                "fields": [
+                    {
+                        "type": "vector",
+                        "numDimensions": vector_dim,
+                        "path": "embedding",
+                        "similarity": "cosine",
+                    },
+                    {
+                        "type": "filter",
+                        "path": "metadata.name",
+                    },
+                    {
+                        "type": "filter",
+                        "path": "metadata.roles",
+                    },
+                ]
+            },
+            name=searchIndexName,
+            type="vectorSearch",
+        )
+
+        try:
+            collection.create_search_index(model=search_index_model)
+            logger.info(
+                f"Created vector search index '{searchIndexName}' on "
+                f"collection={collection_name or self.collection_name} (vector_dim={vector_dim})"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create search index '{searchIndexName}': {e}")
+            raise
 
 # from pymongo import MongoClient
 # import logging
