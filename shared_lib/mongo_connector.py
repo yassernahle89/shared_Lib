@@ -315,7 +315,7 @@ class MongoWriter:
                     },
                     {
                         "type": "filter",
-                        "path": "metadata.name",
+                        "path": "metadata.type",
                     },
                     {
                         "type": "filter",
