@@ -360,6 +360,76 @@ class MongoWriter:
             logger.error(f"Failed to check search index '{searchIndexName}': {e}")
             raise
 
+    def CreateTextSearchIndex(self, collection_name=None) -> bool:
+        """
+        Create a regular (non-vector) Atlas Search index named
+        "text_search" on the given collection: full-text search on `text`
+        (lucene.standard analyzer) and exact-match on `batch_id` (token).
+
+        Returns True if the index was created successfully.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        search_index_model = SearchIndexModel(
+            definition={
+                "mappings": {
+                    "dynamic": False,
+                    "fields": {
+                        "text": {
+                            "type": "string",
+                            "analyzer": "lucene.standard",
+                        },
+                        "batch_id": {
+                            "type": "token",
+                        },
+                    },
+                }
+            },
+            name="text_search",
+            type="search",
+        )
+
+        try:
+            collection.create_search_index(model=search_index_model)
+            logger.info(
+                f"Created text search index 'text_search' on "
+                f"collection={collection_name or self.collection_name}"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create text search index 'text_search': {e}")
+            raise
+
+    def TextSearchIndexExists(self, collection_name=None) -> bool:
+        """
+        Check whether the "text_search" index already exists on the
+        collection. Call this before CreateTextSearchIndex() to avoid a
+        duplicate-index error.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        try:
+            return any(collection.list_search_indexes("text_search"))
+        except Exception as e:
+            logger.error(f"Failed to check search index 'text_search': {e}")
+            raise
+
 # from pymongo import MongoClient
 # import logging
 
