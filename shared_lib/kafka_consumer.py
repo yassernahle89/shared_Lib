@@ -112,7 +112,17 @@ class KafkaConsumerService:
                 file=sys.stderr,
                 flush=True,
             )
+    def _on_assign(self, consumer, partitions):
+        print(
+            f"Assigned partitions: {[(p.topic, p.partition) for p in partitions]}",
+            flush=True,
+        )
 
+    def _on_revoke(self, consumer, partitions):
+        print(
+            f"Revoked partitions: {[(p.topic, p.partition) for p in partitions]}",
+            flush=True,
+        )
     def start(self) -> int:
         self.mongo_writer = MongoWriter(
             uri=self.mongodb_url,
@@ -124,7 +134,12 @@ class KafkaConsumerService:
         self.mongo_writer.connect()
 
         self.consumer = Consumer(self.conf)
-        self.consumer.subscribe([self.topic])
+        # self.consumer.subscribe([self.topic])
+        self.consumer.subscribe(
+            [self.topic],
+            on_assign=self._on_assign,
+            on_revoke=self._on_revoke,
+        )
         # self.consumer.assign([TopicPartition(self.topic, 0)])
         # hb_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
         # hb_thread.start()
