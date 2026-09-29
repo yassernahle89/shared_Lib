@@ -154,9 +154,23 @@ class KafkaConsumerService:
                 msg = self.consumer.poll(timeout=5.0)
                 if msg is not None:
                     break
+            # if msg is None:
+            #     print("No message available — exiting cleanly.", flush=True)
             if msg is None:
-                print("No message available — exiting cleanly.", flush=True)
-
+                print("No message available — committing positions and exiting.", flush=True)
+                try:
+                    assignment = self.consumer.assignment()
+                    if assignment:
+                        positions = self.consumer.position(assignment)
+                        valid = [tp for tp in positions if tp.offset >= 0]
+                        if valid:
+                            self.consumer.commit(offsets=valid, asynchronous=False)
+                            print(f"Committed positions: {[(tp.partition, tp.offset) for tp in valid]}", flush=True)
+                        else:
+                            print(f"No valid positions to commit: {[(tp.partition, tp.offset) for tp in positions]}", flush=True)
+                except Exception as e:
+                    print(f"Failed to commit positions on empty poll: {e}", file=sys.stderr, flush=True)
+                    
             elif msg.error():
                 raise KafkaException(msg.error())
 
