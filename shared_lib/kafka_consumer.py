@@ -158,19 +158,26 @@ class KafkaConsumerService:
             # if msg is None:
             #     print("No message available — exiting cleanly.", flush=True)
             if msg is None:
-                print("No message available — committing positions and exiting.", flush=True)
+                print("No message available.", flush=True)
                 try:
                     assignment = self.consumer.assignment()
-                    if assignment:
-                        positions = self.consumer.position(assignment)
-                        valid = [tp for tp in positions if tp.offset >= 0]
-                        if valid:
-                            self.consumer.commit(offsets=valid, asynchronous=False)
-                            print(f"Committed positions: {[(tp.partition, tp.offset) for tp in valid]}", flush=True)
-                        else:
-                            print(f"No valid positions to commit: {[(tp.partition, tp.offset) for tp in positions]}", flush=True)
+                    committed = self.consumer.committed(assignment, timeout=10)
+                    to_commit = []
+                    for tp in committed:
+                        low, high = self.consumer.get_watermark_offsets(
+                            TopicPartition(tp.topic, tp.partition), timeout=10, cached=False
+                        )
+                        print(
+                            f"Partition {tp.partition}: committed={tp.offset} low={low} high={high}",
+                            flush=True,
+                        )
+                        if low == high and tp.offset != high:
+                            to_commit.append(TopicPartition(tp.topic, tp.partition, high))
+                    if to_commit:
+                        self.consumer.commit(offsets=to_commit, asynchronous=False)
+                        print(f"Committed empty partitions to end: {[(t.partition, t.offset) for t in to_commit]}", flush=True)
                 except Exception as e:
-                    print(f"Failed to commit positions on empty poll: {e}", file=sys.stderr, flush=True)
+                    print(f"Failed to inspect/commit offsets on empty poll: {e}", file=sys.stderr, flush=True)
 
             elif msg.error():
                 raise KafkaException(msg.error())
