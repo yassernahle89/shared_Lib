@@ -70,6 +70,7 @@ class KafkaConsumerService:
             or int(os.environ.get("MAX_POLL_INTERVAL_MS", str(90 * 60 * 1000))),
             "session.timeout.ms": session_timeout_ms
             or int(os.environ.get("SESSION_TIMEOUT_MS", "45000")),
+            "partition.assignment.strategy": "cooperative-sticky"
         }
 
         sasl_username = sasl_username or os.environ.get("REDPANDA_SASL_USERNAME")
@@ -170,7 +171,7 @@ class KafkaConsumerService:
                             print(f"No valid positions to commit: {[(tp.partition, tp.offset) for tp in positions]}", flush=True)
                 except Exception as e:
                     print(f"Failed to commit positions on empty poll: {e}", file=sys.stderr, flush=True)
-                    
+
             elif msg.error():
                 raise KafkaException(msg.error())
 
