@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from pymongo.operations import SearchIndexModel
 import logging
 import uuid
+from datetime import datetime, timezone
 from bson import ObjectId
 from bson.errors import InvalidId
 
@@ -251,6 +252,166 @@ class MongoWriter:
             for cluster in document.get("Clusters", [])
             if cluster.get("IsActive")
         ]
+
+    def AddJobToBatch(self, batch_id, job_id: str, job_type: str, status: str, message: dict, collection_name="batch") -> bool:
+        """
+        Append a new Job entry to a batch document's `Jobs` array.
+
+        job_id is the caller-supplied Job.Id (so it can be reused later,
+        e.g. with SetJobFinishedAt, without re-fetching the batch). job_type
+        /status map to Job.Type/Job.Status, `message` (the json object
+        received by the job itself) is stored as Job.Inputs. CreatedAt and
+        StartedAt are stamped with the current time; FinishedAt is left
+        unset until the job actually finishes.
+
+        Returns True if a document was actually matched and modified.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if batch_id is None:
+            logger.warning("Skipping AddJobToBatch(): batch_id is None")
+            return False
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        query_id = batch_id
+        if isinstance(batch_id, str):
+            try:
+                query_id = ObjectId(batch_id)
+            except InvalidId:
+                query_id = batch_id
+
+        now = datetime.now(timezone.utc)
+        job = {
+            "Id": job_id,
+            "Type": job_type,
+            "Status": status,
+            "Inputs": message,
+            "Metrics": {},
+            "CreatedAt": now,
+            "StartedAt": now,
+        }
+
+        try:
+            result = collection.update_one(
+                {"_id": query_id},
+                {
+                    "$push": {"Jobs": job},
+                    "$set": {"UpdatedAt": now},
+                },
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Failed to add job to batch _id={batch_id}: {e}")
+            raise
+
+    def SetJobFinishedAt(self, batch_id, job_id: str, collection_name="batch") -> bool:
+        """
+        Set `FinishedAt` (to the current time) on a single job within a
+        batch document's `Jobs` array. Only touches FinishedAt — no other
+        job field is modified.
+
+        Returns True if a matching job was found and modified.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if batch_id is None or job_id is None:
+            logger.warning("Skipping SetJobFinishedAt(): batch_id/job_id is None")
+            return False
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        query_id = batch_id
+        if isinstance(batch_id, str):
+            try:
+                query_id = ObjectId(batch_id)
+            except InvalidId:
+                query_id = batch_id
+
+        now = datetime.now(timezone.utc)
+
+        try:
+            result = collection.update_one(
+                {"_id": query_id, "Jobs.Id": job_id},
+                {"$set": {"Jobs.$.FinishedAt": now, "UpdatedAt": now}},
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Failed to set FinishedAt for job_id={job_id} on batch _id={batch_id}: {e}")
+            raise
+
+    def UpdateBatchProgress(
+        self,
+        batch_id,
+        total_documents: int = None,
+        processed_documents: int = None,
+        total_chunks: int = None,
+        embedded_chunks: int = None,
+        percent: float = None,
+        collection_name="batch",
+    ) -> bool:
+        """
+        Update fields on a batch document's `Progress` sub-object
+        (TotalDocuments, ProcessedDocuments, TotalChunks, EmbeddedChunks,
+        Percent). Only the fields you pass (non-None) are updated — the
+        rest of Progress is left untouched.
+
+        Returns True if a document was actually matched and modified.
+        """
+        if self.client is None:
+            raise RuntimeError("MongoWriter not connected. Call connect() first.")
+
+        if batch_id is None:
+            logger.warning("Skipping UpdateBatchProgress(): batch_id is None")
+            return False
+
+        fields = {
+            "Progress.TotalDocuments": total_documents,
+            "Progress.ProcessedDocuments": processed_documents,
+            "Progress.TotalChunks": total_chunks,
+            "Progress.EmbeddedChunks": embedded_chunks,
+            "Progress.Percent": percent,
+        }
+        set_fields = {key: value for key, value in fields.items() if value is not None}
+
+        if not set_fields:
+            logger.warning("Skipping UpdateBatchProgress(): no fields provided")
+            return False
+
+        if collection_name:
+            collection = self.client[self.db_name][collection_name]
+        else:
+            if self.collection is None:
+                raise RuntimeError("MongoWriter not connected. Call connect() first.")
+            collection = self.collection
+
+        query_id = batch_id
+        if isinstance(batch_id, str):
+            try:
+                query_id = ObjectId(batch_id)
+            except InvalidId:
+                query_id = batch_id
+
+        set_fields["UpdatedAt"] = datetime.now(timezone.utc)
+
+        try:
+            result = collection.update_one({"_id": query_id}, {"$set": set_fields})
+            return result.modified_count > 0
+        except Exception as e:
+            logger.error(f"Failed to update Progress for batch _id={batch_id}: {e}")
+            raise
 
     def find(self, query: dict, collection_name=None) -> list:
         """
