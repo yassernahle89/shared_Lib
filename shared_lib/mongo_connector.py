@@ -289,7 +289,7 @@ class MongoWriter:
 
         now = datetime.now(timezone.utc)
         job = {
-            "Id": job_id,
+            "_id": job_id,
             "Type": job_type,
             "Status": status,
             "Inputs": message,
