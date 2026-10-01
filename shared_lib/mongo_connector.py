@@ -255,7 +255,10 @@ class MongoWriter:
 
     def AddJobToBatch(self, batch_id, job_id: str, job_type: str, status: str, message: dict, collection_name="batch") -> bool:
         """
-        Append a new Job entry to a batch document's `Jobs` array.
+        Append a new Job entry to a batch document's `Jobs` array — unless a
+        job of the same Type already exists on the batch, in which case
+        that existing job is instead retried: only its Status (set to
+        "Retry") and StartedAt (now) are updated, nothing else.
 
         job_id is the caller-supplied Job.Id (so it can be reused later,
         e.g. with SetJobFinishedAt, without re-fetching the batch). job_type
@@ -288,17 +291,36 @@ class MongoWriter:
                 query_id = batch_id
 
         now = datetime.now(timezone.utc)
-        job = {
-            "_id": job_id,
-            "Type": job_type,
-            "Status": status,
-            "Inputs": message,
-            "Metrics": {},
-            "CreatedAt": now,
-            "StartedAt": now,
-        }
 
         try:
+            existing_job = collection.find_one(
+                {"_id": query_id, "Jobs.Type": job_type},
+                {"_id": 1},
+            )
+
+            if existing_job:
+                result = collection.update_one(
+                    {"_id": query_id, "Jobs.Type": job_type},
+                    {
+                        "$set": {
+                            "Jobs.$.Status": "Retry",
+                            "Jobs.$.StartedAt": now,
+                            "UpdatedAt": now,
+                        }
+                    },
+                )
+                return result.modified_count > 0
+
+            job = {
+                "_id": job_id,
+                "Type": job_type,
+                "Status": status,
+                "Inputs": message,
+                "Metrics": {},
+                "CreatedAt": now,
+                "StartedAt": now,
+            }
+
             result = collection.update_one(
                 {"_id": query_id},
                 {
@@ -412,6 +434,20 @@ class MongoWriter:
         except Exception as e:
             logger.error(f"Failed to update Progress for batch _id={batch_id}: {e}")
             raise
+
+    def UpdateTotalChunks(self, batch_id, total_chunks: int, collection_name="batch") -> bool:
+        """
+        Set Progress.TotalChunks on a batch document to the given value.
+        Returns True if a document was actually matched and modified.
+        """
+        return self.UpdateBatchProgress(batch_id, total_chunks=total_chunks, collection_name=collection_name)
+
+    def UpdateEmbeddedChunks(self, batch_id, embedded_chunks: int, collection_name="batch") -> bool:
+        """
+        Set Progress.EmbeddedChunks on a batch document to the given value.
+        Returns True if a document was actually matched and modified.
+        """
+        return self.UpdateBatchProgress(batch_id, embedded_chunks=embedded_chunks, collection_name=collection_name)
 
     def find(self, query: dict, collection_name=None) -> list:
         """
