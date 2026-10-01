@@ -344,7 +344,7 @@ class MongoWriter:
 
         try:
             result = collection.update_one(
-                {"_id": query_id, "Jobs.Id": job_id},
+                {"_id": query_id, "Jobs._id": job_id},
                 {"$set": {"Jobs.$.FinishedAt": now, "UpdatedAt": now}},
             )
             return result.modified_count > 0
