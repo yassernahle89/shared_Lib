@@ -385,3 +385,8 @@ class S3Writer:
             if e.response["Error"]["Code"] in ("404", "NoSuchKey", "NotFound"):
                 return False
             raise
+
+    def result_file_exists(self, file_s3_url: str, result_filename: str) -> bool:
+        bucket, file_key = self._parse_s3_path(file_s3_url)
+        prefix = file_key.rsplit("/", 1)[0] + "/" if "/" in file_key else ""
+        return self.file_exists(f"s3://{bucket}/{prefix}{result_filename}")    
