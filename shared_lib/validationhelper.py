@@ -33,3 +33,22 @@ def skip_if_missing(handler, s3_writer=None):
         return handler(document, batch, raw_value, ctx)
 
     return wrapped
+
+
+def skip_if_batch_missing(handler):
+    """
+    Batch-only variant of skip_if_missing for jobs whose messages carry just a
+    BatchId (no FileId / s3UL). Skips (so the consumer commits) when the batch
+    doc is gone; lookup errors still raise and are retried.
+    """
+    def wrapped(document: dict, batch: dict, raw_value: bytes, ctx: dict) -> None:
+        batch_id = ctx.get("batch_id")
+        if not batch_id or not batch:
+            logging.getLogger(__name__).warning(
+                f"Batch {batch_id} not found in MongoDB, skipping. "
+                f"raw_message={raw_value.decode('utf-8', errors='replace')}"
+            )
+            return
+        return handler(document, batch, raw_value, ctx)
+
+    return wrapped
