@@ -6,6 +6,7 @@ import logging
 import mimetypes
 from typing import Any
 from urllib.parse import urlparse
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
@@ -355,7 +356,8 @@ class S3Writer:
 
         self.save_result(result, upper_s3_url, result_filename="batch_topic_results_preview.json")
 
-    def get_topics_clusters_data_by_batch_preview(self, file_s3_url: str):
+    def get_topics_clusters_data_by_batch_preview(self, file_s3_url: str): 
+
         """
         Fetch "batch_topic_results_preview.json" from one folder level
         above the given raw file's S3 URL.
@@ -373,3 +375,13 @@ class S3Writer:
         preview_s3_url = f"s3://{bucket}/{upper_prefix}batch_topic_results_preview.json"
 
         return self.get_file(preview_s3_url)
+
+    def file_exists(self, file_s3_url: str) -> bool:
+        bucket, key = self._parse_s3_path(file_s3_url)
+        try:
+            self.client.head_object(Bucket=bucket, Key=key)
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("404", "NoSuchKey", "NotFound"):
+                return False
+            raise
