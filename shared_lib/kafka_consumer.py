@@ -42,6 +42,7 @@ class KafkaConsumerService:
         sasl_username: str = None,
         sasl_password: str = None,
         sasl_mechanism: str = None,
+        batch_scoped: bool = True,
     ):
         if callback is None:
             raise ValueError("callback is required")
@@ -49,6 +50,7 @@ class KafkaConsumerService:
         self.callback = callback
         self.topic = topic
         self.group_id = group_id
+        self.batch_scoped = batch_scoped
 
         self.poll_timeout_sec = poll_timeout_sec or float(
             os.environ.get("POLL_TIMEOUT_SEC", "90")
@@ -183,7 +185,16 @@ class KafkaConsumerService:
                 raise KafkaException(msg.error())
 
             else:
-                document = json.loads(msg.value())
+                # document = json.loads(msg.value())
+                try:
+                    document = json.loads(msg.value())
+                except (ValueError, TypeError) as parse_e:
+                    if self.batch_scoped:
+                        raise
+                    print(f"Skipping unparseable message: {parse_e}", file=sys.stderr, flush=True)
+                    self.consumer.commit(msg, asynchronous=False)
+                    return exit_code
+
                 # Store the Kafka message in MongoDB
                 mongo_document = {
                     "message": document,
@@ -192,16 +203,29 @@ class KafkaConsumerService:
                 try:
                     # --- DB + processing work: all-or-nothing ---
                     # inserted_id = self.mongo_writer.insert(document)
-                    inserted_id = self.mongo_writer.insert(mongo_document)
+                    # inserted_id = self.mongo_writer.insert(mongo_document)
 
-                    batch_id = document.get("BatchId")
-                    batch = self.mongo_writer.get(batch_id, "batch")
-                    file_id = document.get("FileId")
+                    # batch_id = document.get("BatchId")
+                    # batch = self.mongo_writer.get(batch_id, "batch")
+                    # file_id = document.get("FileId")
+
+                    # ctx = {
+                    #     "mongo_writer": self.mongo_writer,
+                    #     "file_id": file_id,
+                    #     "batch_id": document.get("BatchId"),
+                    # }
+                    if self.batch_scoped:
+                        inserted_id = self.mongo_writer.insert(mongo_document)
+                        batch_id = document.get("BatchId")
+                        batch = self.mongo_writer.get(batch_id, "batch")
+                        file_id = document.get("FileId")
+                    else:
+                        batch_id = batch = file_id = None
 
                     ctx = {
                         "mongo_writer": self.mongo_writer,
                         "file_id": file_id,
-                        "batch_id": document.get("BatchId"),
+                        "batch_id": batch_id,
                     }
                     self.callback(document, batch, msg.value(), ctx)
                     # self.callback(document, batch, msg.value())
