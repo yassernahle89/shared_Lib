@@ -219,13 +219,17 @@ class KafkaConsumerService:
                         batch_id = document.get("BatchId")
                         batch = self.mongo_writer.get(batch_id, "batch")
                         file_id = document.get("FileId")
+                        user_id = document.get("UserId")
+                        tenant_id = document.get("TenantId")
                     else:
-                        batch_id = batch = file_id = None
+                        batch_id = batch = file_id = user_id = tenant_id = None
 
                     ctx = {
                         "mongo_writer": self.mongo_writer,
                         "file_id": file_id,
                         "batch_id": batch_id,
+                        "user_id": user_id,
+                        "tenant_id": tenant_id,
                     }
                     self.callback(document, batch, msg.value(), ctx)
                     # self.callback(document, batch, msg.value())

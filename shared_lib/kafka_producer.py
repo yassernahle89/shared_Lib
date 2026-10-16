@@ -1,6 +1,8 @@
 import json
 import os
 import logging
+import uuid
+from datetime import datetime, timezone
 from confluent_kafka import Producer, KafkaException
 
 logger = logging.getLogger(__name__)
@@ -92,6 +94,53 @@ class KafkaProducerService:
             raise KafkaException(
                 f"Broker rejected message for topic={topic}: {delivery_result['err']}"
             )
+
+    _NOTIFICATION_SEVERITIES = {"info", "success", "warning", "error"}
+
+    def produce_notification(
+        self,
+        userId: str,
+        tenantId: str,
+        message: str,
+        severity: str = "info",
+        payload: dict = None,
+    ) -> None:
+        """
+        Build and produce a notification event to the topic configured via
+        the NOTIFICATION_TOPIC env var:
+
+            {
+              "id": "<uuid4>",
+              "userId": userId,
+              "tenantId": tenantId,
+              "type": "notification",
+              "message": message,
+              "severity": severity,
+              "payload": payload,
+              "createdAt": "<now, ISO 8601 UTC>"
+            }
+
+        severity must be one of "info", "success", "warning", "error".
+        """
+        if severity not in self._NOTIFICATION_SEVERITIES:
+            raise ValueError(
+                f"Invalid severity={severity!r}; must be one of {sorted(self._NOTIFICATION_SEVERITIES)}"
+            )
+
+        topic = os.environ["NOTIFICATION_TOPIC"]
+
+        value = {
+            "id": str(uuid.uuid4()),
+            "userId": userId,
+            "tenantId": tenantId,
+            "type": "notification",
+            "message": message,
+            "severity": severity,
+            "payload": payload or {},
+            "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+        self.produce(topic=topic, value=value)
 
     def close(self):
         try:
