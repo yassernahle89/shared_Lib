@@ -142,6 +142,37 @@ class KafkaProducerService:
 
         self.produce(topic=topic, value=value)
 
+    def produce_batch_event(self, userId: str, tenantId: str, payload: dict) -> None:
+        """
+        Build and produce a batch status event to the topic configured via
+        the NOTIFICATION_TOPIC env var:
+
+            {
+              "id": "<uuid4>",
+              "userId": userId,
+              "tenantId": tenantId,
+              "type": "batch",
+              "message": "",
+              "severity": "",
+              "payload": payload,
+              "createdAt": "<now, ISO 8601 UTC>"
+            }
+        """
+        topic = os.environ["NOTIFICATION_TOPIC"]
+
+        value = {
+            "id": str(uuid.uuid4()),
+            "userId": userId,
+            "tenantId": tenantId,
+            "type": "batch",
+            "message": "",
+            "severity": "",
+            "payload": payload,
+            "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+        self.produce(topic=topic, value=value)
+
     def close(self):
         try:
             remaining = self._producer.flush(timeout=self._flush_timeout)
