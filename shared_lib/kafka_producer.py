@@ -101,14 +101,18 @@ class KafkaProducerService:
         self,
         userId: str,
         tenantId: str,
-        message: str,
+        message: str = None,
         severity: str = "info",
         payload: dict = None,
+        notification_id: str = None,
+        params: dict = None,
     ) -> None:
         """
         Build and produce a notification event to the topic configured via
-        the NOTIFICATION_TOPIC env var:
+        the NOTIFICATION_TOPIC env var.
 
+        Text mode (message given, notification_id omitted — unchanged from
+        before):
             {
               "id": "<uuid4>",
               "userId": userId,
@@ -120,12 +124,30 @@ class KafkaProducerService:
               "createdAt": "<now, ISO 8601 UTC>"
             }
 
+        Templated mode (notification_id given): "message" is omitted and
+        replaced with "notificationId" and "params":
+            {
+              "id": "<uuid4>",
+              "userId": userId,
+              "tenantId": tenantId,
+              "type": "notification",
+              "notificationId": notification_id,
+              "params": params,
+              "severity": severity,
+              "payload": payload,
+              "createdAt": "<now, ISO 8601 UTC>"
+            }
+
         severity must be one of "info", "success", "warning", "error".
+        Raises ValueError if neither message nor notification_id is given.
         """
         if severity not in self._NOTIFICATION_SEVERITIES:
             raise ValueError(
                 f"Invalid severity={severity!r}; must be one of {sorted(self._NOTIFICATION_SEVERITIES)}"
             )
+
+        if notification_id is None and message is None:
+            raise ValueError("produce_notification() requires either message or notification_id")
 
         topic = os.environ["NOTIFICATION_TOPIC"]
 
@@ -134,11 +156,17 @@ class KafkaProducerService:
             "userId": userId,
             "tenantId": tenantId,
             "type": "notification",
-            "message": message,
-            "severity": severity,
-            "payload": payload or {},
-            "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
+
+        if notification_id is not None:
+            value["notificationId"] = notification_id
+            value["params"] = params or {}
+        else:
+            value["message"] = message
+
+        value["severity"] = severity
+        value["payload"] = payload or {}
+        value["createdAt"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         self.produce(topic=topic, value=value)
 
